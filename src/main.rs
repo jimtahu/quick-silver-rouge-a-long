@@ -1,9 +1,11 @@
 use quicksilver::{
-    geom::{Shape, Vector},
+    geom::{ Rectangle, Shape, Vector},
     graphics::{Background::Img, Color, Font, FontStyle, Image},
     lifecycle::{run, Asset, Settings, State, Window},
     Future, Result
 };
+
+use std::collections::HashMap;
 
 #[derive(Clone, Debug, PartialEq)]
 struct Tile {
@@ -78,6 +80,8 @@ struct Game {
     map: Vec<Tile>,
     entities: Vec<Entity>,
     player_id: usize,
+    tileset: Asset<HashMap<char, Image>>,
+    tile_size_px: Vector,
 }
 
 impl State for Game {
@@ -91,6 +95,19 @@ impl State for Game {
            font.render("Square font by Wouter Van Oortmerssen, terms: CC BY 3.0", &FontStyle::new(12.0, Color::BLACK))
        }));
        let game_glyphs = "#@g.%";
+       let tile_size_px = Vector::new(12, 24);
+       let tileset = Asset::new(Font::load(font_square).and_then(move |text| {
+           let tiles = text.render( game_glyphs, &FontStyle::new(tile_size_px.y, Color::WHITE) )
+               .expect("Could not render the font tileset.");
+           let mut tileset = HashMap::new();
+           for ( index, glyph ) in game_glyphs.chars().enumerate() {
+               let pos = ( index as i32 * tile_size_px.x as i32, 0 );
+               let tile = tiles.subimage( Rectangle::new(pos, tile_size_px) );
+               tileset.insert( glyph, tile );
+           }
+           Ok(tileset)
+       }));
+
 
        let map_size = Vector::new( 40, 40 );
        let map = generate_map( map_size );
@@ -112,6 +129,8 @@ impl State for Game {
            map,
            entities,
            player_id,
+           tileset,
+           tile_size_px,
        })
    }
 
