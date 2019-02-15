@@ -1,6 +1,6 @@
 use quicksilver::{
     geom::{ Rectangle, Shape, Vector},
-    graphics::{Background::Img, Color, Font, FontStyle, Image},
+    graphics::{Background::Blended, Background::Img, Color, Font, FontStyle, Image},
     lifecycle::{run, Asset, Settings, State, Window},
     Future, Result
 };
@@ -67,6 +67,9 @@ fn generate_map( size: Vector ) -> Vec<Tile> {
                 glyph: '.',
                 color: Color::BLACK,
             };
+            if x == 0 || x == width - 1 || y == 0 || y == height - 1 {
+                tile.glyph = '#';
+            }
             map.push(tile);
         }
     }
@@ -95,7 +98,7 @@ impl State for Game {
            font.render("Square font by Wouter Van Oortmerssen, terms: CC BY 3.0", &FontStyle::new(12.0, Color::BLACK))
        }));
        let game_glyphs = "#@g.%";
-       let tile_size_px = Vector::new(12, 24);
+       let tile_size_px = Vector::new(24, 24);
        let tileset = Asset::new(Font::load(font_square).and_then(move |text| {
            let tiles = text.render( game_glyphs, &FontStyle::new(tile_size_px.y, Color::WHITE) )
                .expect("Could not render the font tileset.");
@@ -109,7 +112,7 @@ impl State for Game {
        }));
 
 
-       let map_size = Vector::new( 40, 40 );
+       let map_size = Vector::new( 20, 20 );
        let map = generate_map( map_size );
        let mut entities = generate_entities();
        let player_id = entities.len();
@@ -144,7 +147,7 @@ impl State for Game {
 
        self.title.execute(|image| {
            window.draw(
-               &image.area().with_center((window.screen_size().x as i32 / 2, 40)),
+               &image.area().with_center((window.screen_size().x as i32 / 2, 30)),
                Img(&image),
            );
            Ok(())
@@ -155,6 +158,22 @@ impl State for Game {
                &image.area().translate((4, window.screen_size().y as i32 - 60)),
                Img(&image),
            );
+           Ok(())
+       })?;
+
+       let tile_size_px = self.tile_size_px;
+       let ( tileset, map ) = (&mut self.tileset, &self.map );
+       tileset.execute(|tileset| {
+           let offset_px = Vector::new(20, 50);
+           for tile in map.iter() {
+               if let Some(image) = tileset.get(&tile.glyph) {
+                   let pos_px = tile.pos.times(tile_size_px);
+                   window.draw(
+                       &Rectangle::new(offset_px + pos_px, image.area().size()),
+                       Blended( &image, tile.color ),
+                   );
+               }
+           }
            Ok(())
        })?;
 
