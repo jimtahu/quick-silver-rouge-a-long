@@ -1,6 +1,7 @@
 use quicksilver::{
     geom::{ Rectangle, Shape, Vector},
     graphics::{Background::Blended, Background::Img, Color, Font, FontStyle, Image},
+    input::Key,
     lifecycle::{run, Asset, Settings, State, Window},
     Future, Result
 };
@@ -139,6 +140,24 @@ impl State for Game {
 
    /// Process input / update game state
    fn update(&mut self, window: &mut Window) -> Result<()> {
+       use quicksilver::input::ButtonState::*;
+
+       let player = &mut self.entities[self.player_id];
+       if window.keyboard()[Key::H] == Pressed {
+           player.pos.x -= 1.0;
+       }
+       if window.keyboard()[Key::L] == Pressed {
+           player.pos.x += 1.0;
+       }
+       if window.keyboard()[Key::K] == Pressed {
+           player.pos.y -= 1.0;
+       }
+       if window.keyboard()[Key::J] == Pressed {
+           player.pos.y += 1.0;
+       }
+       if window.keyboard()[Key::Q].is_down() {
+           window.close();
+       }
        Ok(())
    }
    /// Draw stuff
@@ -198,6 +217,7 @@ impl State for Game {
 fn main() {
     std::env::set_var("WINIT_HIDPI_FACTOR", "1.0");
     let settings = Settings {
+        resize: quicksilver::graphics::ResizeStrategy::Fill,
         scale: quicksilver::graphics::ImageScaleStrategy::Blur,
         ..Default::default()
     };
