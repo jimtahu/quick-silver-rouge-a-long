@@ -1,5 +1,5 @@
 use quicksilver::{
-    geom::{ Rectangle, Shape, Vector},
+    geom::{ Rectangle, Shape, Tile, Tilemap, Vector},
     graphics::{Background::Blended, Background::Img, Color, Font, FontStyle, Image},
     input::Key,
     lifecycle::{run, Asset, Settings, State, Window},
@@ -7,13 +7,6 @@ use quicksilver::{
 };
 
 use std::collections::HashMap;
-
-#[derive(Clone, Debug, PartialEq)]
-struct Tile {
-    pos: Vector,
-    glyph: char,
-    color: Color,
-}
 
 #[derive(Clone, Debug, PartialEq)]
 struct Entity {
@@ -57,35 +50,47 @@ fn generate_entities( ) -> Vec<Entity> {
     ]
 }
 
-fn generate_map( size: Vector ) -> Vec<Tile> {
+#[derive(Clone, Debug, PartialEq)]
+struct RougeTile {
+    pos: Vector,
+    glyph: char,
+    color: Color,
+}
+
+fn generate_map( size: Vector ) -> ( Vec<RougeTile>, Vec<Tile<char>> ) {
     let width = size.x as usize;
     let height = size.y as usize;
     let mut map = Vec::with_capacity( width * height );
+    let mut blocks = Vec::with_capacity( width * height );
     for x in 0..width {
         for y in 0..height {
-            let mut tile = Tile {
+            let mut tile = RougeTile {
                 pos: Vector::new( x as f32, y as f32 ),
                 glyph: '.',
                 color: Color::WHITE,
             };
             if x == 0 || x == width - 1 || y == 0 || y == height - 1 {
                 tile.glyph = '#';
+                blocks.push( Tile::solid( Some( tile.glyph ) ) );
+            } else {
+                blocks.push( Tile::empty( Some( tile.glyph ) ) );
             }
             map.push(tile);
         }
     }
-    map
+    ( map, blocks )
 }
 
 struct Game {
     title: Asset<Image>,
     square_font_info: Asset<Image>,
     map_size: Vector,
-    map: Vec<Tile>,
+    map: Vec<RougeTile>,
     entities: Vec<Entity>,
     player_id: usize,
     tileset: Asset<HashMap<char, Image>>,
     tile_size_px: Vector,
+    map_block: Tilemap<char>,
 }
 
 impl State for Game {
@@ -114,7 +119,8 @@ impl State for Game {
 
 
        let map_size = Vector::new( 20, 20 );
-       let map = generate_map( map_size );
+       let ( map, blocks ) = generate_map( map_size );
+       let map_block = Tilemap::with_data( blocks, map_size, tile_size_px );
        let mut entities = generate_entities();
        let player_id = entities.len();
 
@@ -135,6 +141,7 @@ impl State for Game {
            player_id,
            tileset,
            tile_size_px,
+           map_block,
        })
    }
 
@@ -142,21 +149,24 @@ impl State for Game {
    fn update(&mut self, window: &mut Window) -> Result<()> {
        use quicksilver::input::ButtonState::*;
 
-       let player = &mut self.entities[self.player_id];
+       let mut player_pos = self.entities[self.player_id].pos;
        if window.keyboard()[Key::H] == Pressed {
-           player.pos.x -= 1.0;
+           player_pos.x -= 1.0;
        }
        if window.keyboard()[Key::L] == Pressed {
-           player.pos.x += 1.0;
+           player_pos.x += 1.0;
        }
        if window.keyboard()[Key::K] == Pressed {
-           player.pos.y -= 1.0;
+           player_pos.y -= 1.0;
        }
        if window.keyboard()[Key::J] == Pressed {
-           player.pos.y += 1.0;
+           player_pos.y += 1.0;
        }
        if window.keyboard()[Key::Q].is_down() {
            window.close();
+       }
+       if self.map_block.valid( player_pos ) {
+           self.entities[self.player_id].pos = player_pos;
        }
        Ok(())
    }
