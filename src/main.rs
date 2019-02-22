@@ -66,7 +66,7 @@ fn generate_map( size: Vector ) -> Vec<Tile> {
             let mut tile = Tile {
                 pos: Vector::new( x as f32, y as f32 ),
                 glyph: '.',
-                color: Color::BLACK,
+                color: Color::WHITE,
             };
             if x == 0 || x == width - 1 || y == 0 || y == height - 1 {
                 tile.glyph = '#';
@@ -93,10 +93,10 @@ impl State for Game {
    fn new() -> Result<Self> {
        let font_square = "square.ttf";
        let title = Asset::new(Font::load(font_square).and_then(|font| {
-           font.render("QuickSilver Roguelike", &FontStyle::new(20.0, Color::BLACK))
+           font.render("QuickSilver Roguelike", &FontStyle::new(20.0, Color::RED))
        }));
        let square_font_info = Asset::new(Font::load(font_square).and_then(|font| {
-           font.render("Square font by Wouter Van Oortmerssen, terms: CC BY 3.0", &FontStyle::new(12.0, Color::BLACK))
+           font.render("Square font by Wouter Van Oortmerssen, terms: CC BY 3.0", &FontStyle::new(12.0, Color::GREEN))
        }));
        let game_glyphs = "#@g.%";
        let tile_size_px = Vector::new(24, 24);
@@ -162,7 +162,7 @@ impl State for Game {
    }
    /// Draw stuff
    fn draw(&mut self, window: &mut Window) -> Result<()> {
-       window.clear(Color::WHITE)?;
+       window.clear(Color::BLACK)?;
 
        self.title.execute(|image| {
            window.draw(
