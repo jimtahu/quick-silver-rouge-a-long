@@ -8,6 +8,15 @@ const SCREEN_WIDTH: i32 = 80;
 const SCREEN_HEIGHT: i32 = 60;
 const LIMIT_FPS: i32 = 20;
 
+// map size
+const MAP_WIDTH: i32 = 80;
+const MAP_HEIGHT: i32 = 45;
+// map colors
+const COLOR_DARK_WALL: Color = Color { r: 0, g: 0, b: 100 };
+const COLOR_DARK_GROUND: Color = Color { r: 50, g: 50, b: 150 };
+// map colors
+
+#[derive(Debug)]
 struct Object {
     x: i32,
     y: i32,
@@ -28,6 +37,27 @@ impl Object {
     pub fn draw( &self, con: &mut dyn Console ) {
         con.set_default_foreground(self.color);
         con.put_char(self.x,self.y,self.char,BackgroundFlag::None);
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+struct Tile {
+    blocked: bool,
+    block_sight: bool,
+}
+
+impl Tile {
+    pub fn empty() -> Self {
+        Tile {
+            blocked: false,
+            block_sight: false,
+        }
+    }
+    pub fn wall() -> Self {
+        Tile {
+            blocked: true,
+            block_sight: true,
+        }
     }
 }
 
