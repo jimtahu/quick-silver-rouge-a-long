@@ -1,3 +1,4 @@
+use std::cmp;
 use tcod::colors::*;
 use tcod::console::*;
 use tcod::input::Key;
@@ -92,6 +93,18 @@ fn create_room( room: Rect, map: &mut Map ) {
     }
 }
 
+fn create_h_tunnel( x1: i32, x2: i32, y: i32, map: &mut Map ) {
+    for x in cmp::min(x1,x2)..(cmp::max(x1,x2)+1) {
+        map[x as usize][y as usize] = Tile::empty();
+    }
+}
+
+fn create_v_tunnel( y1: i32, y2: i32, x: i32, map: &mut Map ) {
+    for y in cmp::min(y1,y2)..(cmp::max(y1,y2)+1) {
+        map[x as usize][y as usize] = Tile::empty();
+    }
+}
+
 struct Game {
     map: Map,
 }
@@ -103,6 +116,7 @@ fn make_map() -> Map {
     let room2 = Rect::new(50,15,10,15);
     create_room(room1, &mut map);
     create_room(room2, &mut map);
+    create_h_tunnel(25,55,23, &mut map);
     map
 }
 
