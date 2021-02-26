@@ -61,6 +61,47 @@ impl Tile {
     }
 }
 
+type Map = Vec<Vec<Tile>>;
+
+struct Game {
+    map: Map,
+}
+
+fn make_map() -> Map {
+    // fill with empty tiles
+    let mut map = vec![vec![Tile::empty(); MAP_HEIGHT as usize]; MAP_WIDTH as usize ];
+    map[30][22] = Tile::wall();
+    map[50][22] = Tile::wall();
+    map
+}
+
+fn render_all( tcod: &mut Tcod, game: &Game, objects: &[Object]) {
+    //draw the objects
+    for object in objects {
+        object.draw(&mut tcod.con);
+    }
+    //draw the map tiles as background color
+    for y in 0..MAP_HEIGHT {
+        for x in 0..MAP_WIDTH {
+            let wall = game.map[x as usize][y as usize].block_sight;
+            if wall {
+                tcod.con.set_char_background( x, y, COLOR_DARK_WALL, BackgroundFlag::Set );
+            } else {
+                tcod.con.set_char_background( x, y, COLOR_DARK_GROUND, BackgroundFlag::Set );
+            }
+        }
+    }
+    blit(
+        &tcod.con,
+        ( 0, 0 ),
+        ( SCREEN_WIDTH, SCREEN_HEIGHT ),
+        &mut tcod.root,
+        (0, 0),
+        1.0,
+        1.0,
+    );
+}
+
 struct Tcod {
     root: Root,
     con: Offscreen,
@@ -93,27 +134,20 @@ fn main() {
         .size(SCREEN_WIDTH,SCREEN_HEIGHT)
         .title("Rust/libtcod tutorial")
         .init();
-    let con = Offscreen::new( SCREEN_WIDTH, SCREEN_HEIGHT );
+    let con = Offscreen::new( MAP_WIDTH, MAP_HEIGHT );
     let mut tcod = Tcod { root, con };
     tcod::system::set_fps(LIMIT_FPS);
+
+    let game = Game { 
+        map: make_map(),
+    };
 
     let player = Object::new( SCREEN_WIDTH/2, SCREEN_HEIGHT/2, '@', WHITE );
     let npc = Object::new( SCREEN_WIDTH/2 - 5, SCREEN_HEIGHT/2, '@', YELLOW );
     let mut objects = [ player, npc ];
     while !tcod.root.window_closed() {
         tcod.con.clear();
-        for object in &objects {
-            object.draw(&mut tcod.con);
-        }
-        blit(
-            &tcod.con,
-            ( 0, 0 ),
-            ( SCREEN_WIDTH, SCREEN_HEIGHT ),
-            &mut tcod.root,
-            (0, 0),
-            1.0,
-            1.0,
-            );
+        render_all(&mut tcod, &game, &objects);
         tcod.root.flush();
         let player = &mut objects[0];
         let exit = handle_keys( &mut tcod, player );
