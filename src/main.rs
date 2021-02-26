@@ -29,9 +29,11 @@ impl Object {
         Object{ x, y, char, color }
     }
 
-    pub fn move_by( &mut self, dx: i32, dy: i32 ) {
-        self.x += dx;
-        self.y += dy;
+    pub fn move_by( &mut self, dx: i32, dy: i32, game: &Game ) {
+        if !game.map[(self.x+dx) as usize][(self.y+dy) as usize].blocked {
+            self.x += dx;
+            self.y += dy;
+        }
     }
 
     pub fn draw( &self, con: &mut dyn Console ) {
@@ -107,7 +109,7 @@ struct Tcod {
     con: Offscreen,
 }
 
-fn handle_keys( tcod: &mut Tcod, player: &mut Object ) -> bool
+fn handle_keys( tcod: &mut Tcod, game: &Game, player: &mut Object ) -> bool
 {
     let key = tcod.root.wait_for_keypress(true);
     match key {
@@ -117,10 +119,10 @@ fn handle_keys( tcod: &mut Tcod, player: &mut Object ) -> bool
             tcod.root.set_fullscreen(!fullscreen);
         }
 
-        Key { code: Up, .. } => player.move_by(0,-1),
-        Key { code: Down, .. } => player.move_by(0,1),
-        Key { code: Left, .. } => player.move_by(-1,0),
-        Key { code: Right, .. } => player.move_by(1,0),
+        Key { code: Up, .. } => player.move_by(0,-1,game),
+        Key { code: Down, .. } => player.move_by(0,1,game),
+        Key { code: Left, .. } => player.move_by(-1,0,game),
+        Key { code: Right, .. } => player.move_by(1,0,game),
 
         _ => {}
     }
@@ -150,7 +152,7 @@ fn main() {
         render_all(&mut tcod, &game, &objects);
         tcod.root.flush();
         let player = &mut objects[0];
-        let exit = handle_keys( &mut tcod, player );
+        let exit = handle_keys( &mut tcod, &game, player );
         if exit { break; }
     }
 }
