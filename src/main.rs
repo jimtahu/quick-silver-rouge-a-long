@@ -17,6 +17,9 @@ const MAP_HEIGHT: i32 = 45;
 const ROOM_MAX_SIZE: i32 = 10;
 const ROOM_MIN_SIZE: i32 = 6;
 const MAX_ROOMS: i32 = 30;
+// object placement
+const MAX_ROOM_MONSTERS: i32 = 3;
+const PLAYER: usize = 0;
 // map colors
 const COLOR_DARK_WALL: Color = Color { r: 0, g: 0, b: 100 };
 const COLOR_LIGHT_WALL: Color = Color { r: 130, g: 110, b: 50 };
@@ -129,11 +132,25 @@ fn create_v_tunnel( y1: i32, y2: i32, x: i32, map: &mut Map ) {
     }
 }
 
+fn place_objects( room: Rect, objects: &mut Vec<Object> ){
+    let num_monsters = rand::thread_rng().gen_range(0, MAX_ROOM_MONSTERS+1);
+    for _ in 0..num_monsters {
+        let x = rand::thread_rng().gen_range(room.x1+1,room.x2);
+        let y = rand::thread_rng().gen_range(room.y1+1,room.y2);
+        let monster = if rand::random::<f32>() < 0.8 {
+            Object::new(x,y,'o',DESATURATED_GREEN)
+        } else {
+            Object::new(x,y,'T',DARKER_GREEN)
+        };
+        objects.push(monster);
+    }
+}
+
 struct Game {
     map: Map,
 }
 
-fn make_map(player: &mut Object) -> Map {
+fn make_map(objects: &mut Vec<Object>) -> Map {
     // fill with empty tiles
     let mut map = vec![vec![Tile::wall(); MAP_HEIGHT as usize]; MAP_WIDTH as usize ];
     // create rooms
@@ -150,8 +167,8 @@ fn make_map(player: &mut Object) -> Map {
             let (new_x,new_y) = new_room.center();
             if rooms.is_empty() {
                 // make this the starting room
-                player.x = new_x;
-                player.y = new_y;
+                objects[PLAYER].x = new_x;
+                objects[PLAYER].y = new_y;
             } else {
                 // connect to previous room, coin toss on h-v or v-h
                 let (prev_x,prev_y) = rooms[rooms.len()-1].center();
@@ -163,6 +180,7 @@ fn make_map(player: &mut Object) -> Map {
                     create_h_tunnel( prev_x, new_x, new_y, &mut map);
                 }
             }
+            place_objects(new_room, objects);
             rooms.push(new_room);
         }
     }
@@ -171,7 +189,7 @@ fn make_map(player: &mut Object) -> Map {
 
 fn render_all( tcod: &mut Tcod, game: &mut Game, objects: &[Object], fov_recompute: bool ) {
     if fov_recompute {
-        let player = &objects[0];
+        let player = &objects[PLAYER];
         tcod.fov.compute_fov(player.x,player.y, TORCH_RADIUS, FOV_LIGHT_WALLS, FOV_ALGO);
     }
     //draw the objects
@@ -252,10 +270,9 @@ fn main() {
     tcod::system::set_fps(LIMIT_FPS);
 
     let player = Object::new( 0, 0, '@', WHITE );
-    let npc = Object::new( SCREEN_WIDTH/2 - 5, SCREEN_HEIGHT/2, '@', YELLOW );
-    let mut objects = [ player, npc ];
+    let mut objects = vec![ player ];
     let mut game = Game {
-        map: make_map( &mut objects[0] ),
+        map: make_map( &mut objects ),
     };
     for y in 0..MAP_HEIGHT {
         for x in 0..MAP_WIDTH {
@@ -270,10 +287,10 @@ fn main() {
     let mut previous_player_position = ( -1, -1 );
     while !tcod.root.window_closed() {
         tcod.con.clear();
-        let fov_recompute = previous_player_position != (objects[0].x,objects[0].y);
+        let fov_recompute = previous_player_position != (objects[PLAYER].x,objects[PLAYER].y);
         render_all(&mut tcod, &mut game, &objects, fov_recompute);
         tcod.root.flush();
-        let player = &mut objects[0];
+        let player = &mut objects[PLAYER];
         previous_player_position = ( player.x, player.y );
         let exit = handle_keys( &mut tcod, &game, player );
         if exit { break; }
