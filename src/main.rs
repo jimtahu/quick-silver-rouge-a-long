@@ -266,24 +266,44 @@ struct Tcod {
     fov: FovMap,
 }
 
-fn handle_keys( tcod: &mut Tcod, game: &Game, objects: &mut [Object] ) -> bool
+#[derive(Clone,Copy,Debug,PartialEq)]
+enum PlayerAction {
+    TookTurn,
+    DidntTakeTurn,
+    Exit,
+}
+
+fn handle_keys( tcod: &mut Tcod, game: &Game, objects: &mut [Object] ) -> PlayerAction
 {
+    use PlayerAction::*;
     let key = tcod.root.wait_for_keypress(true);
     match key {
-        Key { code: Escape, .. } => return true,
+        Key { code: Escape, .. } => Exit,
         Key { code: Enter, alt: true, .. } => {
             let fullscreen = tcod.root.is_fullscreen();
             tcod.root.set_fullscreen(!fullscreen);
+            DidntTakeTurn
         }
 
-        Key { code: Up, .. } => move_by(PLAYER,0,-1,&game.map,objects),
-        Key { code: Down, .. } => move_by(PLAYER,0,1,&game.map,objects),
-        Key { code: Left, .. } => move_by(PLAYER,-1,0,&game.map,objects),
-        Key { code: Right, .. } => move_by(PLAYER,1,0,&game.map,objects),
+        Key { code: Up, .. } => {
+            move_by(PLAYER,0,-1,&game.map,objects);
+            TookTurn
+        },
+        Key { code: Down, .. } => {
+            move_by(PLAYER,0,1,&game.map,objects);
+            TookTurn
+        }
+        Key { code: Left, .. } => {
+            move_by(PLAYER,-1,0,&game.map,objects);
+            TookTurn
+        }
+        Key { code: Right, .. } => {
+            move_by(PLAYER,1,0,&game.map,objects);
+            TookTurn
+        }
 
-        _ => {}
+        _ => DidntTakeTurn
     }
-    false
 }
 
 fn main() {
@@ -324,7 +344,7 @@ fn main() {
         tcod.root.flush();
         let player = &mut objects[PLAYER];
         previous_player_position = ( player.x, player.y );
-        let exit = handle_keys( &mut tcod, &game, &mut objects );
-        if exit { break; }
+        let player_action = handle_keys( &mut tcod, &game, &mut objects );
+        if player_action == PlayerAction::Exit { break; }
     }
 }
