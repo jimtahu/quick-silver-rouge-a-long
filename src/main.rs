@@ -277,27 +277,28 @@ fn handle_keys( tcod: &mut Tcod, game: &Game, objects: &mut [Object] ) -> Player
 {
     use PlayerAction::*;
     let key = tcod.root.wait_for_keypress(true);
-    match key {
-        Key { code: Escape, .. } => Exit,
-        Key { code: Enter, alt: true, .. } => {
+    let player_alive = objects[PLAYER].alive;
+    match ( key, key.text(), player_alive ) {
+        ( Key { code: Escape, .. }, _, _ ) => Exit,
+        ( Key { code: Enter, alt: true, .. }, _, _ ) => {
             let fullscreen = tcod.root.is_fullscreen();
             tcod.root.set_fullscreen(!fullscreen);
             DidntTakeTurn
         }
 
-        Key { code: Up, .. } => {
+        ( Key { code: Up, .. }, _, true ) => {
             move_by(PLAYER,0,-1,&game.map,objects);
             TookTurn
         },
-        Key { code: Down, .. } => {
+        ( Key { code: Down, .. }, _, true ) => {
             move_by(PLAYER,0,1,&game.map,objects);
             TookTurn
         }
-        Key { code: Left, .. } => {
+        ( Key { code: Left, .. }, _, true ) => {
             move_by(PLAYER,-1,0,&game.map,objects);
             TookTurn
         }
-        Key { code: Right, .. } => {
+        ( Key { code: Right, .. }, _, true ) => {
             move_by(PLAYER,1,0,&game.map,objects);
             TookTurn
         }
