@@ -218,6 +218,23 @@ fn make_map(objects: &mut Vec<Object>) -> Map {
     map
 }
 
+fn player_move_or_attack( dx: i32, dy: i32, game: &Game, objects: &mut [Object] ) {
+    let x = objects[PLAYER].x + dx;
+    let y = objects[PLAYER].y + dy;
+    let target_id = objects.iter().position(|object| object.pos() == (x,y) );
+    match target_id {
+        Some(target_id) => {
+            println!(
+                "The {} laughs off your punny attack",
+                objects[target_id].name
+            );
+        }
+        None => {
+            move_by(PLAYER, dx, dy, &game.map, objects);
+        }
+    }
+}
+
 fn render_all( tcod: &mut Tcod, game: &mut Game, objects: &[Object], fov_recompute: bool ) {
     if fov_recompute {
         let player = &objects[PLAYER];
@@ -287,19 +304,19 @@ fn handle_keys( tcod: &mut Tcod, game: &Game, objects: &mut [Object] ) -> Player
         }
 
         ( Key { code: Up, .. }, _, true ) => {
-            move_by(PLAYER,0,-1,&game.map,objects);
+            player_move_or_attack(0,-1,game,objects);
             TookTurn
         },
         ( Key { code: Down, .. }, _, true ) => {
-            move_by(PLAYER,0,1,&game.map,objects);
+            player_move_or_attack(0,1,game,objects);
             TookTurn
         }
         ( Key { code: Left, .. }, _, true ) => {
-            move_by(PLAYER,-1,0,&game.map,objects);
+            player_move_or_attack(-1,0,game,objects);
             TookTurn
         }
         ( Key { code: Right, .. }, _, true ) => {
-            move_by(PLAYER,1,0,&game.map,objects);
+            player_move_or_attack(1,0,game,objects);
             TookTurn
         }
 
@@ -347,5 +364,12 @@ fn main() {
         previous_player_position = ( player.x, player.y );
         let player_action = handle_keys( &mut tcod, &game, &mut objects );
         if player_action == PlayerAction::Exit { break; }
+        if objects[PLAYER].alive && player_action != PlayerAction::DidntTakeTurn {
+            for object in &objects {
+                if (object as *const _) != (&objects[PLAYER] as *const _) {
+                    println!("The {} growls!",object.name);
+                }
+            }
+        }
     }
 }
