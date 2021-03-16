@@ -30,6 +30,19 @@ const FOV_ALGO: FovAlgorithm = FovAlgorithm::Basic;
 const FOV_LIGHT_WALLS: bool = true;
 const TORCH_RADIUS: i32 = 10;
 
+#[derive(Clone,Copy,Debug,PartialEq)]
+struct Fighter {
+    max_hp: i32,
+    hp: i32,
+    defense: i32,
+    power: i32,
+}
+
+#[derive(Clone,Debug,PartialEq)]
+enum Ai {
+    Basic,
+}
+
 #[derive(Debug)]
 struct Object {
     x: i32,
@@ -39,6 +52,8 @@ struct Object {
     name: String,
     blocks: bool,
     alive: bool,
+    fighter: Option<Fighter>,
+    ai: Option<Ai>,
 }
 
 impl Object {
@@ -51,6 +66,8 @@ impl Object {
             name: name.into(),
             blocks: blocks,
             alive: false,
+            fighter: None,
+            ai: None,
         }
     }
 
@@ -160,18 +177,43 @@ fn create_v_tunnel( y1: i32, y2: i32, x: i32, map: &mut Map ) {
     }
 }
 
+fn create_orc( x: i32, y: i32 ) -> Object {
+    let mut orc = Object::new(x,y,'o', "orc", DESATURATED_GREEN, true);
+    orc.fighter = Some( Fighter {
+        max_hp: 10,
+        hp: 10,
+        defense: 0,
+        power: 3,
+    });
+    orc.ai = Some( Ai::Basic );
+    orc.alive = true;
+    orc
+}
+
+fn create_troll( x: i32, y: i32 ) -> Object {
+    let mut troll = Object::new(x,y,'T', "troll", DARKER_GREEN, true);
+    troll.fighter = Some(Fighter {
+        max_hp: 16,
+        hp: 16,
+        defense: 1,
+        power: 4,
+    });
+    troll.ai = Some( Ai::Basic );
+    troll.alive = true;
+    troll
+}
+
 fn place_objects( room: Rect, map: &Map, objects: &mut Vec<Object> ){
     let num_monsters = rand::thread_rng().gen_range(0, MAX_ROOM_MONSTERS+1);
     for _ in 0..num_monsters {
         let x = rand::thread_rng().gen_range(room.x1+1,room.x2);
         let y = rand::thread_rng().gen_range(room.y1+1,room.y2);
         if !is_blocked(x, y, map, objects) {
-            let mut monster = if rand::random::<f32>() < 0.8 {
-                Object::new(x,y,'o', "orc", DESATURATED_GREEN, true)
+            let monster = if rand::random::<f32>() < 0.8 {
+                create_orc(x, y)
             } else {
-                Object::new(x,y,'T', "troll", DARKER_GREEN, true)
+                create_troll(x, y)
             };
-            monster.alive = true;
             objects.push(monster);
         }
     }
@@ -340,6 +382,12 @@ fn main() {
 
     let mut player = Object::new( 0, 0, '@', "player", WHITE, true );
     player.alive = true;
+    player.fighter = Some( Fighter {
+        max_hp: 30,
+        hp: 30,
+        defense: 2,
+        power: 5,
+    });
     let mut objects = vec![ player ];
     let mut game = Game {
         map: make_map( &mut objects ),
