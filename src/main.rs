@@ -375,10 +375,13 @@ fn render_all( tcod: &mut Tcod, game: &mut Game, objects: &[Object], fov_recompu
         tcod.fov.compute_fov(player.x,player.y, TORCH_RADIUS, FOV_LIGHT_WALLS, FOV_ALGO);
     }
     //draw the objects
-    for object in objects {
-        if tcod.fov.is_in_fov( object.x, object.y ){
-            object.draw(&mut tcod.con);
-        }
+    let mut to_draw: Vec<_> = objects
+        .iter()
+        .filter( |o| tcod.fov.is_in_fov(o.x,o.y) )
+        .collect();
+    to_draw.sort_by(|o1,o2| { o1.blocks.cmp(&o2.blocks) });
+    for object in &to_draw {
+        object.draw(&mut tcod.con);
     }
     //draw the map tiles as background color
     for y in 0..MAP_HEIGHT {
