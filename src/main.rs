@@ -37,7 +37,7 @@ fn mut_two<T>(first_index: usize, second_index: usize, items: &mut [T]) -> (&mut
     if first_index < second_index {
         (&mut first_slice[first_index],&mut second_slice[0])
     } else {
-        (&mut first_slice[0],&mut second_slice[second_index])
+        (&mut second_slice[0],&mut first_slice[second_index])
     }
 }
 
