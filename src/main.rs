@@ -42,11 +42,18 @@ fn mut_two<T>(first_index: usize, second_index: usize, items: &mut [T]) -> (&mut
 }
 
 #[derive(Clone,Copy,Debug,PartialEq)]
+enum DeathCallback {
+    Player,
+    Monster,
+}
+
+#[derive(Clone,Copy,Debug,PartialEq)]
 struct Fighter {
     max_hp: i32,
     hp: i32,
     defense: i32,
     power: i32,
+    on_death: DeathCallback,
 }
 
 #[derive(Clone,Debug,PartialEq)]
@@ -108,6 +115,12 @@ impl Object {
                 fighter.hp -= damage;
             }
         }
+        if let Some(fighter) = self.fighter {
+            if fighter.hp <= 0 {
+                self.alive = false;
+                fighter.on_death.callback(self);
+            }
+        }
     }
 
     pub fn attack(&mut self, target: &mut Object){
@@ -124,6 +137,17 @@ impl Object {
                 self.name, target.name
                 );
         }
+    }
+}
+
+impl DeathCallback {
+    fn callback(self, object: &mut Object){
+        use DeathCallback::*;
+        let callback: fn(&mut Object) = match self {
+            Player => player_death,
+            Monster => monster_death,
+        };
+        callback(object);
     }
 }
 
@@ -225,6 +249,7 @@ fn create_orc( x: i32, y: i32 ) -> Object {
         hp: 10,
         defense: 0,
         power: 3,
+        on_death: DeathCallback::Monster,
     });
     orc.ai = Some( Ai::Basic );
     orc.alive = true;
@@ -238,6 +263,7 @@ fn create_troll( x: i32, y: i32 ) -> Object {
         hp: 16,
         defense: 1,
         power: 4,
+        on_death: DeathCallback::Monster,
     });
     troll.ai = Some( Ai::Basic );
     troll.alive = true;
@@ -313,7 +339,9 @@ fn move_towards( id: usize, target_x: i32, target_y: i32, map: &Map, objects: &m
 fn player_move_or_attack( dx: i32, dy: i32, game: &Game, objects: &mut [Object] ) {
     let x = objects[PLAYER].x + dx;
     let y = objects[PLAYER].y + dy;
-    let target_id = objects.iter().position(|object| object.pos() == (x,y) );
+    let target_id = objects.iter().position(
+        |object| object.fighter.is_some() && object.pos() == (x,y)
+    );
     match target_id {
         Some(target_id) => {
             let (player,target) = mut_two(PLAYER,target_id,objects);
@@ -323,6 +351,22 @@ fn player_move_or_attack( dx: i32, dy: i32, game: &Game, objects: &mut [Object] 
             move_by(PLAYER, dx, dy, &game.map, objects);
         }
     }
+}
+
+fn player_death( player: &mut Object ) {
+    println!("You dead!");
+    player.char='%';
+    player.color=DARK_RED;
+}
+
+fn monster_death( monster: &mut Object ) {
+    println!("{} dies!", monster.name);
+    monster.char='%';
+    monster.color=DARK_RED;
+    monster.blocks=false;
+    monster.fighter=None;
+    monster.ai=None;
+    monster.name=format!("remains of {}", monster.name);
 }
 
 fn render_all( tcod: &mut Tcod, game: &mut Game, objects: &[Object], fov_recompute: bool ) {
@@ -456,6 +500,7 @@ fn main() {
         hp: 30,
         defense: 2,
         power: 5,
+        on_death: DeathCallback::Player,
     });
     let mut objects = vec![ player ];
     let mut game = Game {
