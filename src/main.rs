@@ -30,6 +30,17 @@ const FOV_ALGO: FovAlgorithm = FovAlgorithm::Basic;
 const FOV_LIGHT_WALLS: bool = true;
 const TORCH_RADIUS: i32 = 10;
 
+fn mut_two<T>(first_index: usize, second_index: usize, items: &mut [T]) -> (&mut T, &mut T) {
+    assert!(first_index!=second_index);
+    let split_at_index = cmp::max(first_index,second_index);
+    let (first_slice,second_slice) = items.split_at_mut(split_at_index);
+    if first_index < second_index {
+        (&mut first_slice[first_index],&mut second_slice[0])
+    } else {
+        (&mut first_slice[0],&mut second_slice[second_index])
+    }
+}
+
 #[derive(Clone,Copy,Debug,PartialEq)]
 struct Fighter {
     max_hp: i32,
@@ -89,6 +100,30 @@ impl Object {
         let dx = other.x - self.x;
         let dy = other.y - self.y;
         ((dx.pow(2)+dy.pow(2)) as f32).sqrt()
+    }
+
+    pub fn take_damage(&mut self, damage: i32){
+        if let Some(fighter) = self.fighter.as_mut() {
+            if damage > 0 {
+                fighter.hp -= damage;
+            }
+        }
+    }
+
+    pub fn attack(&mut self, target: &mut Object){
+        let damage = self.fighter.map_or(0, |f| f.power)-target.fighter.map_or(0, |f| f.defense);
+        if damage > 0 {
+            println!(
+                "{} attacks {} for {}.",
+                self.name, target.name, damage
+                );
+            target.take_damage(damage);
+        } else {
+            println!(
+                "{} attacks {} but has no effect.",
+                self.name, target.name
+                );
+        }
     }
 }
 
@@ -281,10 +316,8 @@ fn player_move_or_attack( dx: i32, dy: i32, game: &Game, objects: &mut [Object] 
     let target_id = objects.iter().position(|object| object.pos() == (x,y) );
     match target_id {
         Some(target_id) => {
-            println!(
-                "The {} laughs off your punny attack",
-                objects[target_id].name
-            );
+            let (player,target) = mut_two(PLAYER,target_id,objects);
+            player.attack(target);
         }
         None => {
             move_by(PLAYER, dx, dy, &game.map, objects);
@@ -332,6 +365,14 @@ fn render_all( tcod: &mut Tcod, game: &mut Game, objects: &[Object], fov_recompu
         1.0,
         1.0,
     );
+    tcod.root.set_default_foreground(WHITE);
+    if let Some(fighter) = objects[PLAYER].fighter {
+        tcod.root.print_ex(
+            1, SCREEN_HEIGHT-2,
+            BackgroundFlag::None, TextAlignment::Left,
+            format!("HP: {}/{}", fighter.hp, fighter.max_hp),
+        );
+    }
 }
 
 struct Tcod {
@@ -354,11 +395,8 @@ fn ai_take_turn( monster_id: usize, tcod: &Tcod, game: &Game, objects: &mut [Obj
             let (player_x,player_y) = objects[PLAYER].pos();
             move_towards(monster_id, player_x, player_y, &game.map, objects);
         } else if objects[PLAYER].fighter.map_or(false, |f| f.hp > 0 ) {
-            let monster = &objects[monster_id];
-            println!(
-                "The {}'s attack bounces off your armor!",
-                monster.name
-            );
+            let (monster,player) = mut_two(monster_id,PLAYER,objects);
+            monster.attack(player);
         }
     }
 }
