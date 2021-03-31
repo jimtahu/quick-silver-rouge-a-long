@@ -115,7 +115,7 @@ impl Object {
         ((dx.pow(2)+dy.pow(2)) as f32).sqrt()
     }
 
-    pub fn take_damage(&mut self, damage: i32){
+    pub fn take_damage(&mut self, damage: i32, game: &mut Game){
         if let Some(fighter) = self.fighter.as_mut() {
             if damage > 0 {
                 fighter.hp -= damage;
@@ -124,36 +124,37 @@ impl Object {
         if let Some(fighter) = self.fighter {
             if fighter.hp <= 0 {
                 self.alive = false;
-                fighter.on_death.callback(self);
+                fighter.on_death.callback(self,game);
             }
         }
     }
 
-    pub fn attack(&mut self, target: &mut Object){
+    pub fn attack(&mut self, target: &mut Object, game: &mut Game){
         let damage = self.fighter.map_or(0, |f| f.power)-target.fighter.map_or(0, |f| f.defense);
         if damage > 0 {
-            println!(
-                "{} attacks {} for {}.",
+            game.messages.add(
+                format!( "{} attacks {} for {}.",
                 self.name, target.name, damage
-                );
-            target.take_damage(damage);
+                ), WHITE );
+            target.take_damage(damage,game);
         } else {
-            println!(
+            game.messages.add(
+                format!(
                 "{} attacks {} but has no effect.",
                 self.name, target.name
-                );
+                ), WHITE );
         }
     }
 }
 
 impl DeathCallback {
-    fn callback(self, object: &mut Object){
+    fn callback(self, object: &mut Object, game: &mut Game){
         use DeathCallback::*;
-        let callback: fn(&mut Object) = match self {
+        let callback = match self {
             Player => player_death,
             Monster => monster_death,
         };
-        callback(object);
+        callback(object,game);
     }
 }
 
@@ -359,7 +360,7 @@ fn move_towards( id: usize, target_x: i32, target_y: i32, map: &Map, objects: &m
     move_by(id, dx, dy, map, objects);
 }
 
-fn player_move_or_attack( dx: i32, dy: i32, game: &Game, objects: &mut [Object] ) {
+fn player_move_or_attack( dx: i32, dy: i32, game: &mut Game, objects: &mut [Object] ) {
     let x = objects[PLAYER].x + dx;
     let y = objects[PLAYER].y + dy;
     let target_id = objects.iter().position(
@@ -368,7 +369,7 @@ fn player_move_or_attack( dx: i32, dy: i32, game: &Game, objects: &mut [Object] 
     match target_id {
         Some(target_id) => {
             let (player,target) = mut_two(PLAYER,target_id,objects);
-            player.attack(target);
+            player.attack(target, game);
         }
         None => {
             move_by(PLAYER, dx, dy, &game.map, objects);
@@ -376,14 +377,14 @@ fn player_move_or_attack( dx: i32, dy: i32, game: &Game, objects: &mut [Object] 
     }
 }
 
-fn player_death( player: &mut Object ) {
-    println!("You dead!");
+fn player_death( player: &mut Object, game: &mut Game ) {
+    game.messages.add("You dead!",RED);
     player.char='%';
     player.color=DARK_RED;
 }
 
-fn monster_death( monster: &mut Object ) {
-    println!("{} dies!", monster.name);
+fn monster_death( monster: &mut Object, game: &mut Game ) {
+    game.messages.add(format!("{} dies!", monster.name), ORANGE);
     monster.char='%';
     monster.color=DARK_RED;
     monster.blocks=false;
@@ -473,7 +474,7 @@ enum PlayerAction {
     Exit,
 }
 
-fn ai_take_turn( monster_id: usize, tcod: &Tcod, game: &Game, objects: &mut [Object] ) {
+fn ai_take_turn( monster_id: usize, tcod: &Tcod, game: &mut Game, objects: &mut [Object] ) {
     let (monster_x, monster_y) = objects[monster_id].pos();
     if tcod.fov.is_in_fov(monster_x, monster_y) {
         if objects[monster_id].distance_to(&objects[PLAYER]) >= 2.0 {
@@ -481,12 +482,12 @@ fn ai_take_turn( monster_id: usize, tcod: &Tcod, game: &Game, objects: &mut [Obj
             move_towards(monster_id, player_x, player_y, &game.map, objects);
         } else if objects[PLAYER].fighter.map_or(false, |f| f.hp > 0 ) {
             let (monster,player) = mut_two(monster_id,PLAYER,objects);
-            monster.attack(player);
+            monster.attack(player,game);
         }
     }
 }
 
-fn handle_keys( tcod: &mut Tcod, game: &Game, objects: &mut [Object] ) -> PlayerAction
+fn handle_keys( tcod: &mut Tcod, game: &mut Game, objects: &mut [Object] ) -> PlayerAction
 {
     use PlayerAction::*;
     let key = tcod.root.wait_for_keypress(true);
@@ -594,12 +595,12 @@ fn main() {
         tcod.root.flush();
         let player = &mut objects[PLAYER];
         previous_player_position = ( player.x, player.y );
-        let player_action = handle_keys( &mut tcod, &game, &mut objects );
+        let player_action = handle_keys( &mut tcod, &mut game, &mut objects );
         if player_action == PlayerAction::Exit { break; }
         if objects[PLAYER].alive && player_action != PlayerAction::DidntTakeTurn {
             for id in 0..objects.len() {
                 if objects[id].ai.is_some() {
-                    ai_take_turn(id, &tcod, &game, &mut objects);
+                    ai_take_turn(id, &tcod, &mut game, &mut objects);
                 }
             }
         }
