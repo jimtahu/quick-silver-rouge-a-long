@@ -14,6 +14,9 @@ const LIMIT_FPS: i32 = 20;
 const BAR_WIDTH: i32 = 20;
 const PANEL_HEIGHT: i32 = 7;
 const PANEL_Y: i32 = SCREEN_HEIGHT - PANEL_HEIGHT;
+const MSG_X: i32 = BAR_WIDTH + 2;
+const MSG_WIDTH: i32 = SCREEN_WIDTH - BAR_WIDTH - 2;
+const MSG_HEIGHT: usize = PANEL_HEIGHT as usize - 1;
 // map size
 const MAP_WIDTH: i32 = 80;
 const MAP_HEIGHT: i32 = 45;
@@ -289,8 +292,25 @@ fn place_objects( room: Rect, map: &Map, objects: &mut Vec<Object> ){
     }
 }
 
+struct Messages {
+    messages: Vec<(String,Color)>,
+}
+
+impl Messages {
+    pub fn new() -> Self {
+        Self { messages: vec![] }
+    }
+    pub fn add<T: Into<String>>( &mut self, messages: T, color: Color ){
+        self.messages.push((messages.into(),color));
+    }
+    pub fn iter(&self) -> impl DoubleEndedIterator<Item = &(String,Color)> {
+        self.messages.iter()
+    }
+}
+
 struct Game {
     map: Map,
+    messages: Messages,
 }
 
 fn make_map(objects: &mut Vec<Object>) -> Map {
@@ -421,6 +441,16 @@ fn render_all( tcod: &mut Tcod, game: &mut Game, objects: &[Object], fov_recompu
     let hp = objects[PLAYER].fighter.map_or(0, |f| f.hp);
     let max_hp = objects[PLAYER].fighter.map_or(0, |f| f.max_hp);
     render_bar(&mut tcod.panel, 1, 1, BAR_WIDTH, "HP", hp, max_hp, LIGHT_RED, DARK_RED);
+    let mut y = MSG_HEIGHT as i32;
+    for &(ref msg, color) in game.messages.iter().rev() {
+        let msg_height = tcod.panel.get_height_rect(MSG_X, y, MSG_WIDTH, 0, msg);
+        y -= msg_height;
+        if y < 0 {
+            break;
+        }
+        tcod.panel.set_default_foreground(color);
+        tcod.panel.print_rect(MSG_X, y, MSG_WIDTH, 0, msg);
+    }
     blit(
         &tcod.panel,
         (0,0),(SCREEN_WIDTH,SCREEN_HEIGHT),
@@ -540,7 +570,12 @@ fn main() {
     let mut objects = vec![ player ];
     let mut game = Game {
         map: make_map( &mut objects ),
+        messages: Messages::new(),
     };
+    game.messages.add(
+        "Welcome, stranger! Prepare to perish in the Tombs of the Ancient Kings.",
+        RED,
+    );
     for y in 0..MAP_HEIGHT {
         for x in 0..MAP_WIDTH {
             tcod.fov.set(
