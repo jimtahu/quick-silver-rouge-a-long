@@ -25,6 +25,7 @@ const ROOM_MIN_SIZE: i32 = 6;
 const MAX_ROOMS: i32 = 30;
 // object placement
 const MAX_ROOM_MONSTERS: i32 = 3;
+const MAX_ROOM_ITEMS: i32 = 2;
 const PLAYER: usize = 0;
 // map colors
 const COLOR_DARK_WALL: Color = Color { r: 0, g: 0, b: 100 };
@@ -54,6 +55,11 @@ enum DeathCallback {
 }
 
 #[derive(Clone,Copy,Debug,PartialEq)]
+enum Item {
+    Heal,
+}
+
+#[derive(Clone,Copy,Debug,PartialEq)]
 struct Fighter {
     max_hp: i32,
     hp: i32,
@@ -78,6 +84,7 @@ struct Object {
     alive: bool,
     fighter: Option<Fighter>,
     ai: Option<Ai>,
+    item: Option<Item>,
 }
 
 impl Object {
@@ -92,6 +99,7 @@ impl Object {
             alive: false,
             fighter: None,
             ai: None,
+            item: None,
         }
     }
 
@@ -291,6 +299,17 @@ fn place_objects( room: Rect, map: &Map, objects: &mut Vec<Object> ){
             objects.push(monster);
         }
     }
+
+    let num_items = rand::thread_rng().gen_range(0, MAX_ROOM_ITEMS+1);
+    for _ in 0..num_items {
+        let x = rand::thread_rng().gen_range(room.x1+1,room.x2);
+        let y = rand::thread_rng().gen_range(room.y1+1,room.y2);
+        if !is_blocked(x, y, map, objects) {
+            let mut object = Object::new(x, y, '!', "healing potion", VIOLET, false);
+            object.item = Some(Item::Heal);
+            objects.push(object);
+        }
+    }
 }
 
 struct Messages {
@@ -312,6 +331,7 @@ impl Messages {
 struct Game {
     map: Map,
     messages: Messages,
+    inventory: Vec<Object>,
 }
 
 fn make_map(objects: &mut Vec<Object>) -> Map {
@@ -572,6 +592,7 @@ fn main() {
     let mut game = Game {
         map: make_map( &mut objects ),
         messages: Messages::new(),
+        inventory: vec![],
     };
     game.messages.add(
         "Welcome, stranger! Prepare to perish in the Tombs of the Ancient Kings.",
