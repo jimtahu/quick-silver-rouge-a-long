@@ -397,6 +397,20 @@ fn player_move_or_attack( dx: i32, dy: i32, game: &mut Game, objects: &mut [Obje
     }
 }
 
+fn pick_item_up( object_id: usize, game: &mut Game, objects: &mut Vec<Object> ){
+    if game.inventory.len() >= 26 {
+        game.messages.add(format!(
+        "Inventory full, cannot pickup {}.", objects[object_id].name
+        ), RED);
+    } else {
+        let item = objects.swap_remove(object_id);
+        game.messages.add(format!(
+        "You picked up a {}.", item.name
+        ), GREEN);
+        game.inventory.push(item);
+    }
+}
+
 fn player_death( player: &mut Object, game: &mut Game ) {
     game.messages.add("You dead!",RED);
     player.char='%';
@@ -507,13 +521,14 @@ fn ai_take_turn( monster_id: usize, tcod: &Tcod, game: &mut Game, objects: &mut 
     }
 }
 
-fn handle_keys( tcod: &mut Tcod, game: &mut Game, objects: &mut [Object] ) -> PlayerAction
+fn handle_keys( tcod: &mut Tcod, game: &mut Game, objects: &mut Vec<Object> ) -> PlayerAction
 {
     use PlayerAction::*;
     let key = tcod.root.wait_for_keypress(true);
     let player_alive = objects[PLAYER].alive;
     match ( key, key.text(), player_alive ) {
         ( Key { code: Escape, .. }, _, _ ) => Exit,
+        ( Key { printable: 'q', .. }, _, _ ) => Exit,
         ( Key { code: Enter, alt: true, .. }, _, _ ) => {
             let fullscreen = tcod.root.is_fullscreen();
             tcod.root.set_fullscreen(!fullscreen);
@@ -535,6 +550,14 @@ fn handle_keys( tcod: &mut Tcod, game: &mut Game, objects: &mut [Object] ) -> Pl
         ( Key { code: Right, .. }, _, true ) => {
             player_move_or_attack(1,0,game,objects);
             TookTurn
+        }
+        ( Key { printable: 'g', .. }, _, true ) => {
+            let item_id = objects.iter()
+                .position(|object| object.pos() == objects[PLAYER].pos() && object.item.is_some() );
+            if let Some(item_id) = item_id {
+                pick_item_up(item_id, game, objects);
+            }
+            DidntTakeTurn
         }
 
         _ => DidntTakeTurn
