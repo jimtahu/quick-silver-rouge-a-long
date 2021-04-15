@@ -17,6 +17,7 @@ const PANEL_Y: i32 = SCREEN_HEIGHT - PANEL_HEIGHT;
 const MSG_X: i32 = BAR_WIDTH + 2;
 const MSG_WIDTH: i32 = SCREEN_WIDTH - BAR_WIDTH - 2;
 const MSG_HEIGHT: usize = PANEL_HEIGHT as usize - 1;
+const INVENTORY_WIDTH: i32 = 50;
 // map size
 const MAP_WIDTH: i32 = 80;
 const MAP_HEIGHT: i32 = 45;
@@ -550,6 +551,20 @@ fn menu<T: AsRef<str>>(header: &str, options: &[T], width: i32, root: &mut Root 
     }
 }
 
+fn inventory_menu( inventory: &[Object], header: &str, root: &mut Root ) -> Option<usize> {
+    let options = if inventory.len() == 0 {
+        vec!["Inventory is empty.".into()]
+    } else {
+        inventory.iter().map(|item| item.name.clone()).collect()
+    };
+    let inventory_index = menu(header,&options,INVENTORY_WIDTH,root);
+    if inventory.len() > 0 {
+        inventory_index
+    } else {
+        None
+    }
+}
+
 fn handle_keys( tcod: &mut Tcod, game: &mut Game, objects: &mut Vec<Object> ) -> PlayerAction
 {
     use PlayerAction::*;
@@ -587,6 +602,10 @@ fn handle_keys( tcod: &mut Tcod, game: &mut Game, objects: &mut Vec<Object> ) ->
                 pick_item_up(item_id, game, objects);
             }
             DidntTakeTurn
+        }
+        ( Key { printable: 'i', .. }, _, true ) => {
+            inventory_menu(&game.inventory, "Select an item to use it, or any other to cancel.\n", &mut tcod.root);
+            TookTurn
         }
 
         _ => DidntTakeTurn
