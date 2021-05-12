@@ -38,6 +38,8 @@ const FOV_ALGO: FovAlgorithm = FovAlgorithm::Basic;
 const FOV_LIGHT_WALLS: bool = true;
 const TORCH_RADIUS: i32 = 10;
 
+const HEAL_AMOUNT: i32 = 4;
+
 fn mut_two<T>(first_index: usize, second_index: usize, items: &mut [T]) -> (&mut T, &mut T) {
     assert!(first_index!=second_index);
     let split_at_index = cmp::max(first_index,second_index);
@@ -58,6 +60,11 @@ enum DeathCallback {
 #[derive(Clone,Copy,Debug,PartialEq)]
 enum Item {
     Heal,
+}
+
+enum  UseResult {
+    UsedUp,
+    Cancelled,
 }
 
 #[derive(Clone,Copy,Debug,PartialEq)]
@@ -134,6 +141,15 @@ impl Object {
             if fighter.hp <= 0 {
                 self.alive = false;
                 fighter.on_death.callback(self,game);
+            }
+        }
+    }
+
+    pub fn heal( &mut self, amount: i32 ) {
+        if let Some(ref mut fighter) = self.fighter {
+            fighter.hp += amount;
+            if fighter.hp > fighter.max_hp {
+                fighter.hp = fighter.max_hp
             }
         }
     }
@@ -412,6 +428,23 @@ fn pick_item_up( object_id: usize, game: &mut Game, objects: &mut Vec<Object> ){
     }
 }
 
+fn cast_heal(
+    _inventory_id: usize,
+    _tcode: &mut Tcod,
+    game: &mut Game,
+    objects: &mut [Object],
+) -> UseResult {
+    if let Some(fighter) = objects[PLAYER].fighter {
+        if fighter.hp == fighter.max_hp {
+            game.messages.add("You are already at full health.",RED);
+        }
+        objects[PLAYER].heal(HEAL_AMOUNT);
+        game.messages.add("Your wounds start to heal!", LIGHT_VIOLET);
+        return UseResult::UsedUp;
+    }
+    UseResult::Cancelled
+}
+
 fn player_death( player: &mut Object, game: &mut Game ) {
     game.messages.add("You dead!",RED);
     player.char='%';
@@ -565,6 +598,27 @@ fn inventory_menu( inventory: &[Object], header: &str, root: &mut Root ) -> Opti
     }
 }
 
+fn use_item( inventory_id: usize, tcod: &mut Tcod, game: &mut Game, objects: &mut [Object]) {
+    use Item::*;
+    if let Some(item) = game.inventory[inventory_id].item {
+        let on_use = match item {
+            Heal => cast_heal,
+        };
+        match on_use( inventory_id, tcod, game, objects ) {
+            UseResult::UsedUp => {
+                game.inventory.remove(inventory_id);
+            }
+            UseResult::Cancelled => {
+                game.messages.add("Cancelled",WHITE);
+            }
+        }
+    } else {
+        game.messages.add(
+            format!("The {} cannot be used.", game.inventory[inventory_id].name),
+            WHITE);
+    }
+}
+
 fn handle_keys( tcod: &mut Tcod, game: &mut Game, objects: &mut Vec<Object> ) -> PlayerAction
 {
     use PlayerAction::*;
@@ -604,7 +658,10 @@ fn handle_keys( tcod: &mut Tcod, game: &mut Game, objects: &mut Vec<Object> ) ->
             DidntTakeTurn
         }
         ( Key { printable: 'i', .. }, _, true ) => {
-            inventory_menu(&game.inventory, "Select an item to use it, or any other to cancel.\n", &mut tcod.root);
+            let inventory_index = inventory_menu(&game.inventory, "Select an item to use it, or any other to cancel.\n", &mut tcod.root);
+            if let Some(inventory_index) = inventory_index {
+                use_item(inventory_index, tcod, game, objects);
+            }
             TookTurn
         }
 
