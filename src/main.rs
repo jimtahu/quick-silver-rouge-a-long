@@ -43,6 +43,9 @@ const HEAL_AMOUNT: i32 = 4;
 const LIGHTNING_DAMAGE: i32 = 40;
 const LIGHTNING_RANGE: i32 = 5;
 
+const CONFUSE_NUM_TURNS: i32 = 10;
+const CONFUSE_RANGE: i32 = 8;
+
 fn mut_two<T>(first_index: usize, second_index: usize, items: &mut [T]) -> (&mut T, &mut T) {
     assert!(first_index!=second_index);
     let split_at_index = cmp::max(first_index,second_index);
@@ -64,6 +67,7 @@ enum DeathCallback {
 enum Item {
     Heal,
     Lightning,
+    Confuse,
 }
 
 enum  UseResult {
@@ -83,6 +87,10 @@ struct Fighter {
 #[derive(Clone,Debug,PartialEq)]
 enum Ai {
     Basic,
+    Confused {
+        previous_ai: Box<Ai>,
+        num_turns: i32,
+    },
 }
 
 #[derive(Debug)]
@@ -331,9 +339,13 @@ fn place_objects( room: Rect, map: &Map, objects: &mut Vec<Object> ){
                 let mut object = Object::new(x, y, '!', "healing potion", VIOLET, false);
                 object.item = Some(Item::Heal);
                 object
-            } else {
+            } else if dice < 0.7 + 0.1 {
                 let mut object = Object::new(x, y, '#', "scroll of lightning bolt", LIGHT_AZURE, false);
                 object.item = Some(Item::Lightning);
+                object
+            } else {
+                let mut object = Object::new(x, y, '#', "scroll of confusion", LIGHT_YELLOW, false);
+                object.item = Some(Item::Confuse);
                 object
             };
             objects.push(item);
@@ -496,6 +508,29 @@ fn cast_lightning(
     }
 }
 
+fn cast_confuse(
+    _inventory_id: usize,
+    tcod: &mut Tcod,
+    game: &mut Game,
+    objects: &mut [Object],
+) -> UseResult {
+    let monster_id = closest_monster( tcod, objects, CONFUSE_RANGE );
+    if let Some(monster_id) = monster_id {
+        let old_ai = objects[monster_id].ai.take().unwrap_or(Ai::Basic);
+        objects[monster_id].ai = Some(Ai::Confused {
+            previous_ai: Box::new(old_ai),
+            num_turns: CONFUSE_NUM_TURNS,
+        });
+        game.messages.add(
+            format!("The {} begins to stumble around!", objects[monster_id].name), LIGHT_GREEN,
+        );
+        UseResult::UsedUp
+    } else {
+        game.messages.add("No enemy is in range.",RED);
+        UseResult::Cancelled
+    }
+}
+
 fn player_death( player: &mut Object, game: &mut Game ) {
     game.messages.add("You dead!",RED);
     player.char='%';
@@ -593,7 +628,7 @@ enum PlayerAction {
     Exit,
 }
 
-fn ai_take_turn( monster_id: usize, tcod: &Tcod, game: &mut Game, objects: &mut [Object] ) {
+fn ai_basic( monster_id: usize, tcod: &Tcod, game: &mut Game, objects: &mut [Object] ) -> Ai {
     let (monster_x, monster_y) = objects[monster_id].pos();
     if tcod.fov.is_in_fov(monster_x, monster_y) {
         if objects[monster_id].distance_to(&objects[PLAYER]) >= 2.0 {
@@ -603,6 +638,40 @@ fn ai_take_turn( monster_id: usize, tcod: &Tcod, game: &mut Game, objects: &mut 
             let (monster,player) = mut_two(monster_id,PLAYER,objects);
             monster.attack(player,game);
         }
+    }
+    Ai::Basic
+}
+
+fn ai_confused(
+    monster_id: usize,
+    game: &mut Game,
+    objects: &mut [Object],
+    previous_ai: Box<Ai>,
+    num_turns: i32
+) -> Ai {
+    if num_turns >= 0 {
+        move_by(
+            monster_id,
+            rand::thread_rng().gen_range(-1, 2),
+            rand::thread_rng().gen_range(-1, 2),
+            &game.map,
+            objects
+        );
+        Ai::Confused { previous_ai: previous_ai, num_turns: num_turns-1 }
+    } else {
+        game.messages.add(format!("The {} is no longer confused!", objects[monster_id].name ), RED );
+        *previous_ai
+    }
+}
+
+fn ai_take_turn( monster_id: usize, tcod: &Tcod, game: &mut Game, objects: &mut [Object] ) {
+    use Ai::*;
+    if let Some(ai) = objects[monster_id].ai.take() {
+        let new_ai = match ai {
+            Basic => ai_basic(monster_id, tcod, game, objects),
+            Confused { previous_ai, num_turns } => ai_confused(monster_id, game, objects, previous_ai, num_turns),
+        };
+        objects[monster_id].ai = Some(new_ai);
     }
 }
 
@@ -655,6 +724,7 @@ fn use_item( inventory_id: usize, tcod: &mut Tcod, game: &mut Game, objects: &mu
         let on_use = match item {
             Heal => cast_heal,
             Lightning => cast_lightning,
+            Confuse => cast_confuse,
         };
         match on_use( inventory_id, tcod, game, objects ) {
             UseResult::UsedUp => {
